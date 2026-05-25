@@ -3,6 +3,9 @@
     windows_subsystem = "windows"
 )]
 
+use directories::ProjectDirs;
+use std::fs;
+use std::path::PathBuf;
 use chrono::Local;
 use iced::widget::{column, container, row, scrollable, text, Space};
 use iced::{keyboard, Alignment, Background, Color, Element, Font, Length, Subscription, Task};
@@ -140,7 +143,24 @@ struct StudyApp {
 
 impl StudyApp {
     fn new() -> (Self, Task<Message>) {
-        let conn = Connection::open("study_tracker.db").expect("Failed to open local database");
+        // 1. Determine the correct OS-specific path for the database
+        let db_path = if let Some(proj_dirs) = ProjectDirs::from("com", "MyOrg", "StudyTracker") {
+            let data_dir = proj_dirs.data_dir();
+
+            // 2. Create the folder if it doesn't exist yet
+            fs::create_dir_all(data_dir).expect("Failed to create application data directory");
+
+            data_dir.join("study_tracker.db")
+        } else {
+            // Fallback to the local folder if the OS doesn't provide a standard path
+            PathBuf::from("study_tracker.db")
+        };
+
+        // Convert the path to a string (sqlitex expects something that can act as a string/path)
+        let path_str = db_path.to_string_lossy().to_string();
+
+        // 3. Open the connection
+        let conn = Connection::open(&path_str).expect("Failed to open local database");
         let mut db = Db::new(conn);
         db.migrate().expect("Failed to run database migrations");
 
